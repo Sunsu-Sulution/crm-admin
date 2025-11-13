@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 interface MemberData {
   customer_ref?: string;
@@ -120,12 +120,57 @@ export default function Home() {
   const [billDetails, setBillDetails] = useState<BillDetail[]>([]);
   const [expandedBills, setExpandedBills] = useState<Set<number>>(new Set());
   const [selectedBill, setSelectedBill] = useState<BillDetail | null>(null);
+  const [billDateFilter, setBillDateFilter] = useState({
+    start: "",
+    end: "",
+  });
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [points, setPoints] = useState<PointBalance[]>([]);
   const [tierMovements, setTierMovements] = useState<TierMovement[]>([]);
   const [activeTab, setActiveTab] = useState<
     "info" | "bills" | "coupons" | "points" | "tier"
   >("info");
+
+  const filteredBills = useMemo(() => {
+    if (!billDateFilter.start && !billDateFilter.end) {
+      return billDetails;
+    }
+
+    const startDate = billDateFilter.start
+      ? new Date(billDateFilter.start)
+      : null;
+    if (startDate) startDate.setHours(0, 0, 0, 0);
+
+    const endDate = billDateFilter.end ? new Date(billDateFilter.end) : null;
+    if (endDate) endDate.setHours(23, 59, 59, 999);
+
+    return billDetails.filter((bill) => {
+      if (!bill.payment_date) {
+        return false;
+      }
+
+      const paymentDate = new Date(bill.payment_date);
+      if (Number.isNaN(paymentDate.getTime())) {
+        return false;
+      }
+
+      if (startDate && paymentDate < startDate) {
+        return false;
+      }
+
+      if (endDate && paymentDate > endDate) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [billDetails, billDateFilter.start, billDateFilter.end]);
+
+  const hasBillDateFilter =
+    billDateFilter.start !== "" || billDateFilter.end !== "";
+
+  const displayedBills = hasBillDateFilter ? filteredBills : billDetails;
+  const hasBillResults = displayedBills.length > 0;
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +238,10 @@ export default function Home() {
     setBillDetails([]);
     setCoupons([]);
     setPoints([]);
+    setTierMovements([]);
+    setSelectedBill(null);
+    setExpandedBills(new Set());
+    setBillDateFilter({ start: "", end: "" });
     setError(null);
   };
 
@@ -430,12 +479,62 @@ export default function Home() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
                     รายการบิล
                   </h3>
-                  {billDetails.length > 0 ? (
+
+                  <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between mb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          ตั้งแต่วันที่
+                        </label>
+                        <input
+                          type="date"
+                          value={billDateFilter.start}
+                          onChange={(e) =>
+                            setBillDateFilter((prev) => ({
+                              ...prev,
+                              start: e.target.value,
+                            }))
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          ถึงวันที่
+                        </label>
+                        <input
+                          type="date"
+                          value={billDateFilter.end}
+                          onChange={(e) =>
+                            setBillDateFilter((prev) => ({
+                              ...prev,
+                              end: e.target.value,
+                            }))
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBillDateFilter({ start: "", end: "" });
+                          setExpandedBills(new Set());
+                        }}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors text-sm font-medium disabled:opacity-50"
+                        disabled={!hasBillDateFilter}
+                      >
+                        ล้างตัวกรอง
+                      </button>
+                    </div>
+                  </div>
+
+                  {hasBillResults ? (
                     <div className="overflow-x-auto border border-gray-200 rounded-md">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12"></th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Payment Date
                             </th>
@@ -457,21 +556,39 @@ export default function Home() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {billDetails.map((bill, idx) => {
+                          {displayedBills.map((bill, idx) => {
                             const billId = bill.payment_id || idx;
                             const isExpanded = expandedBills.has(billId);
                             const hasPromotions =
                               bill.promotions && bill.promotions.length > 0;
 
                             return (
-                              <>
+                              <Fragment key={billId}>
                                 <tr
-                                  key={idx}
-                                  className="hover:bg-gray-50 cursor-pointer"
+                                  className="hover:bg-slate-50 cursor-pointer transition-colors"
                                   onClick={() => setSelectedBill(bill)}
                                 >
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    {hasPromotions && (
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {bill.payment_date || "-"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {bill.receipt_no || "-"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {bill.store_name || "-"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {bill.payment_type || "-"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                                    {bill.net_paid
+                                      ? `฿${bill.net_paid.toLocaleString(
+                                          "th-TH",
+                                        )}`
+                                      : "-"}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {hasPromotions ? (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -485,71 +602,54 @@ export default function Home() {
                                           }
                                           setExpandedBills(newExpanded);
                                         }}
-                                        className="text-gray-500 hover:text-gray-700"
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 text-xs font-medium hover:border-blue-300 hover:bg-blue-100 transition-colors"
                                       >
-                                        {isExpanded ? "▼" : "▶"}
+                                        <span>
+                                          {bill.promotions?.length} รายการ
+                                        </span>
+                                        <span
+                                          className={`transition-transform ${
+                                            isExpanded ? "rotate-180" : ""
+                                          }`}
+                                        >
+                                          ▾
+                                        </span>
                                       </button>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {bill.payment_date || "-"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {bill.receipt_no || "-"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {bill.store_name || "-"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {bill.payment_type || "-"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    {bill.net_paid
-                                      ? `฿${bill.net_paid.toLocaleString(
-                                          "th-TH",
-                                        )}`
-                                      : "-"}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {hasPromotions ? (
-                                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                                        {bill.promotions?.length} รายการ
-                                      </span>
                                     ) : (
                                       <span className="text-gray-400">-</span>
                                     )}
                                   </td>
                                 </tr>
                                 {isExpanded && hasPromotions && (
-                                  <tr key={`promo-${idx}`}>
+                                  <tr>
                                     <td
-                                      colSpan={7}
-                                      className="px-6 py-4 bg-gray-50 border-t border-gray-200"
+                                      colSpan={6}
+                                      className="px-6 py-4 bg-slate-50 border-t border-slate-200"
                                     >
-                                      <div className="ml-4">
-                                        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+                                      <div className="rounded-lg border border-slate-200 bg-white shadow-sm p-4">
+                                        <h4 className="text-sm font-semibold text-slate-700 mb-2">
                                           Promotion ที่ใช้ในบิลนี้:
                                         </h4>
                                         <div className="overflow-x-auto">
                                           <table className="min-w-full divide-y divide-gray-200">
-                                            <thead className="bg-gray-100">
+                                            <thead className="bg-slate-100">
                                               <tr>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
                                                   Promotion Name
                                                 </th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
                                                   Type
                                                 </th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
                                                   Discount Price
                                                 </th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
                                                   Before VAT
                                                 </th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
                                                   VAT Amount
                                                 </th>
-                                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                                                <th className="px-4 py-2 text-left text-xs font-medium text-slate-600">
                                                   Ref Code
                                                 </th>
                                               </tr>
@@ -559,7 +659,7 @@ export default function Home() {
                                                 (promo, promoIdx) => (
                                                   <tr
                                                     key={promoIdx}
-                                                    className="hover:bg-gray-50"
+                                                    className="hover:bg-slate-50"
                                                   >
                                                     <td className="px-4 py-2 text-sm text-gray-900">
                                                       {promo.promotion_name ||
@@ -601,7 +701,7 @@ export default function Home() {
                                     </td>
                                   </tr>
                                 )}
-                              </>
+                              </Fragment>
                             );
                           })}
                         </tbody>
@@ -609,7 +709,11 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="text-center py-12 border border-gray-200 rounded-md bg-gray-50">
-                      <p className="text-gray-500">ไม่มีข้อมูลบิล</p>
+                      <p className="text-gray-500">
+                        {hasBillDateFilter
+                          ? "ไม่พบข้อมูลบิลตามช่วงวันที่ที่เลือก"
+                          : "ไม่มีข้อมูลบิล"}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -853,7 +957,7 @@ export default function Home() {
         {/* Bill Detail Modal */}
         {selectedBill && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-[#00000045] bg-opacity-30 flex items-center justify-center z-50 p-4"
             onClick={() => setSelectedBill(null)}
           >
             <div
