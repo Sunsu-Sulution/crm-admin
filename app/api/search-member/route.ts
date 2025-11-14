@@ -30,9 +30,30 @@ export async function POST(request: NextRequest) {
     }
 
     if (name && name.trim()) {
-      conditions.push(`(firstname_th ILIKE $${paramIndex} OR lastname_th ILIKE $${paramIndex} OR firstname_en ILIKE $${paramIndex} OR lastname_en ILIKE $${paramIndex})`);
-      values.push(`%${name.trim()}%`);
-      paramIndex++;
+      const trimmedName = name.trim();
+      const likeValue = `%${trimmedName}%`;
+      const noSpaceValue = `%${trimmedName.replace(/\s+/g, "")}%`;
+      conditions.push(`(
+        firstname_th ILIKE $${paramIndex} OR
+        lastname_th ILIKE $${paramIndex + 1} OR
+        firstname_en ILIKE $${paramIndex + 2} OR
+        lastname_en ILIKE $${paramIndex + 3} OR
+        CONCAT(firstname_th, ' ', lastname_th) ILIKE $${paramIndex + 4} OR
+        CONCAT(firstname_en, ' ', lastname_en) ILIKE $${paramIndex + 5} OR
+        CONCAT(firstname_th, lastname_th) ILIKE $${paramIndex + 6} OR
+        CONCAT(firstname_en, lastname_en) ILIKE $${paramIndex + 7}
+      )`);
+      values.push(
+        likeValue,
+        likeValue,
+        likeValue,
+        likeValue,
+        likeValue,
+        likeValue,
+        noSpaceValue,
+        noSpaceValue
+      );
+      paramIndex += 8;
     }
 
     if (conditions.length === 0) {
@@ -45,6 +66,13 @@ export async function POST(request: NextRequest) {
     const whereClause = conditions.join(' AND ');
 
     // Query member data from primo_memberships
+    const hasExactFilter = Boolean(
+      (customer_ref && customer_ref.trim()) ||
+        (mobile && mobile.trim()) ||
+        (email && email.trim()),
+    );
+    const memberQueryLimit = hasExactFilter ? 1 : 20;
+
     const memberQuery = `
       SELECT 
         customer_ref,
@@ -59,19 +87,20 @@ export async function POST(request: NextRequest) {
         last_active_at
       FROM primo_memberships
       WHERE ${whereClause}
-      LIMIT 1
+      LIMIT ${memberQueryLimit}
     `;
 
     const memberResult = await pool.query(memberQuery, values);
+    const members = memberResult.rows;
 
-    if (memberResult.rows.length === 0) {
+    if (members.length === 0) {
       return NextResponse.json(
         { error: 'ไม่พบข้อมูลสมาชิก' },
         { status: 404 }
       );
     }
 
-    const member = memberResult.rows[0];
+    const member = members[0];
 
     // Query related data
     const customerRef = member.customer_ref;
@@ -384,19 +413,22 @@ export async function POST(request: NextRequest) {
           tier_group_name: 'Migrated',
         }] : []);
 
-    return NextResponse.json({
+    const responsePayload = {
       member: memberWithMigrated,
+      members,
       bills: billsWithPromotions,
       coupons: couponsResult.rows,
       points: pointsResult.rows,
       tierMovements: finalTierMovements,
-    });
+    };
 
     // Log for debugging
     console.log('Coupons found:', couponsResult.rows.length);
     if (couponsResult.rows.length > 0) {
       console.log('Sample coupon:', couponsResult.rows[0]);
     }
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     console.error('Database query error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

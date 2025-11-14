@@ -137,6 +137,7 @@ export default function Home() {
     start: "",
     end: "",
   });
+  const [memberCandidates, setMemberCandidates] = useState<MemberData[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [points, setPoints] = useState<PointBalance[]>([]);
   const [tierMovements, setTierMovements] = useState<TierMovement[]>([]);
@@ -185,16 +186,22 @@ export default function Home() {
   const displayedBills = hasBillDateFilter ? filteredBills : billDetails;
   const hasBillResults = displayedBills.length > 0;
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const performSearch = async (
+    payload: typeof searchFields,
+    options: { validate?: boolean; updateForm?: boolean } = {},
+  ) => {
+    const { validate = false, updateForm = false } = options;
 
-    // Check if at least one field has value
-    const hasValue = Object.values(searchFields).some(
-      (val) => val.trim() !== "",
-    );
-    if (!hasValue) {
-      setError("กรุณากรอกข้อมูลอย่างน้อย 1 ช่อง");
-      return;
+    if (validate) {
+      const hasValue = Object.values(payload).some((val) => val.trim() !== "");
+      if (!hasValue) {
+        setError("กรุณากรอกข้อมูลอย่างน้อย 1 ช่อง");
+        return;
+      }
+    }
+
+    if (updateForm) {
+      setSearchFields(payload);
     }
 
     setLoading(true);
@@ -205,7 +212,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(searchFields),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -215,27 +222,11 @@ export default function Home() {
       }
 
       setMemberData(data.member);
+      setMemberCandidates(data.members || (data.member ? [data.member] : []));
       setBillDetails(data.bills || []);
       setCoupons(data.coupons || []);
       setPoints(data.points || []);
       setTierMovements(data.tierMovements || []);
-
-      // If no tier movements but has migrated data, create tier movement from migrated data
-      if (
-        data.tierMovements &&
-        data.tierMovements.length === 0 &&
-        data.member?.isMigrated &&
-        data.member?.migratedData
-      ) {
-        const migratedTier: TierMovement = {
-          tier_id: data.member.migratedData.tier_id,
-          tier_name: data.member.migratedData.tier_name,
-          entry_date: new Date().toISOString(),
-          loyalty_program_name: "Food Story",
-          tier_group_name: "Migrated",
-        };
-        setTierMovements([migratedTier]);
-      }
 
       // Debug logging
       console.log("Coupons received:", data.coupons?.length || 0);
@@ -248,6 +239,7 @@ export default function Home() {
         error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการค้นหา";
       setError(errorMessage);
       setMemberData(null);
+      setMemberCandidates([]);
       setBillDetails([]);
       setCoupons([]);
       setPoints([]);
@@ -255,6 +247,21 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await performSearch(searchFields, { validate: true });
+  };
+
+  const handleCandidateSelect = async (candidate: MemberData) => {
+    const payload = {
+      customer_ref: candidate.customer_ref || "",
+      mobile: candidate.mobile || "",
+      email: candidate.email || "",
+      name: "",
+    };
+    await performSearch(payload, { updateForm: true });
   };
 
   const handleClear = () => {
@@ -265,6 +272,7 @@ export default function Home() {
       name: "",
     });
     setMemberData(null);
+    setMemberCandidates([]);
     setBillDetails([]);
     setCoupons([]);
     setPoints([]);
@@ -429,6 +437,59 @@ export default function Home() {
                       <p className="text-sm text-amber-700">
                         สมาชิกคนนี้ถูก migrate จาก Food Story
                       </p>
+                    </div>
+                  )}
+                  {memberCandidates.length > 1 && (
+                    <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-semibold text-blue-800">
+                            พบผลการค้นหา {memberCandidates.length} รายการ
+                          </p>
+                          <p className="text-xs text-blue-700">
+                            เลือกสมาชิกที่ต้องการเพื่อดูรายละเอียด
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {memberCandidates.map((candidate) => {
+                          const isActive =
+                            candidate.customer_ref === memberData.customer_ref;
+                          const displayName =
+                            candidate.firstname_th || candidate.firstname_en
+                              ? `${
+                                  candidate.firstname_th ||
+                                  candidate.firstname_en ||
+                                  "-"
+                                } ${
+                                  candidate.lastname_th ||
+                                  candidate.lastname_en ||
+                                  ""
+                                }`.trim()
+                              : candidate.customer_ref || "-";
+                          return (
+                            <button
+                              key={`${candidate.customer_ref}-${candidate.mobile}`}
+                              onClick={() => handleCandidateSelect(candidate)}
+                              className={`text-left rounded-lg border px-4 py-3 bg-white transition-all ${
+                                isActive
+                                  ? "border-blue-500 shadow-sm ring-1 ring-blue-300"
+                                  : "border-transparent hover:border-blue-200 hover:shadow-sm"
+                              }`}
+                            >
+                              <p className="text-sm font-semibold text-gray-900">
+                                {displayName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Phone: {candidate.mobile || "-"}
+                              </p>
+                              <p className="text-xs text-gray-400">
+                                Customer Ref: {candidate.customer_ref || "-"}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
