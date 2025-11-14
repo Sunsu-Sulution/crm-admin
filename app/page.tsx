@@ -13,6 +13,19 @@ interface MemberData {
   member_status?: string;
   account_status?: string;
   last_active_at?: string;
+  isMigrated?: boolean;
+  migratedData?: MigratedFoodStoryMember;
+}
+
+interface MigratedFoodStoryMember {
+  phone_no?: number;
+  firstname_th?: string;
+  lastname_th?: string;
+  firstname_en?: string;
+  lastname_en?: string;
+  current_point?: number;
+  tier_id?: number;
+  tier_name?: string;
 }
 
 interface BillDetail {
@@ -207,6 +220,23 @@ export default function Home() {
       setPoints(data.points || []);
       setTierMovements(data.tierMovements || []);
 
+      // If no tier movements but has migrated data, create tier movement from migrated data
+      if (
+        data.tierMovements &&
+        data.tierMovements.length === 0 &&
+        data.member?.isMigrated &&
+        data.member?.migratedData
+      ) {
+        const migratedTier: TierMovement = {
+          tier_id: data.member.migratedData.tier_id,
+          tier_name: data.member.migratedData.tier_name,
+          entry_date: new Date().toISOString(),
+          loyalty_program_name: "Food Story",
+          tier_group_name: "Migrated",
+        };
+        setTierMovements([migratedTier]);
+      }
+
       // Debug logging
       console.log("Coupons received:", data.coupons?.length || 0);
       if (data.coupons && data.coupons.length > 0) {
@@ -385,91 +415,179 @@ export default function Home() {
             <div className="p-6">
               {/* Member Info Tab */}
               {activeTab === "info" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      ข้อมูลพื้นฐาน
-                    </h3>
-                    <dl className="space-y-4">
-                      <div className="border-b border-gray-200 pb-3">
-                        <dt className="text-sm font-medium text-gray-500 mb-1">
-                          Customer Reference
-                        </dt>
-                        <dd className="text-base text-gray-900">
-                          {memberData.customer_ref || "-"}
-                        </dd>
+                <div className="space-y-6">
+                  {memberData.isMigrated && memberData.migratedData && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-amber-600 font-semibold">
+                          ⚠️ Migrated Member
+                        </span>
+                        <span className="px-2 py-1 text-xs font-medium bg-amber-200 text-amber-800 rounded">
+                          Migrated from Food Story
+                        </span>
                       </div>
-                      <div className="border-b border-gray-200 pb-3">
-                        <dt className="text-sm font-medium text-gray-500 mb-1">
-                          เบอร์โทรศัพท์
-                        </dt>
-                        <dd className="text-base text-gray-900">
-                          {memberData.mobile || "-"}
-                        </dd>
-                      </div>
-                      <div className="border-b border-gray-200 pb-3">
-                        <dt className="text-sm font-medium text-gray-500 mb-1">
-                          อีเมล
-                        </dt>
-                        <dd className="text-base text-gray-900 break-all">
-                          {memberData.email || "-"}
-                        </dd>
-                      </div>
-                      <div className="border-b border-gray-200 pb-3">
-                        <dt className="text-sm font-medium text-gray-500 mb-1">
-                          ชื่อ-นามสกุล (ไทย)
-                        </dt>
-                        <dd className="text-base text-gray-900">
-                          {memberData.firstname_th || "-"}{" "}
-                          {memberData.lastname_th || ""}
-                        </dd>
-                      </div>
-                      <div className="pb-3">
-                        <dt className="text-sm font-medium text-gray-500 mb-1">
-                          ชื่อ-นามสกุล (อังกฤษ)
-                        </dt>
-                        <dd className="text-base text-gray-900">
-                          {memberData.firstname_en || "-"}{" "}
-                          {memberData.lastname_en || ""}
-                        </dd>
-                      </div>
-                    </dl>
+                      <p className="text-sm text-amber-700">
+                        สมาชิกคนนี้ถูก migrate จาก Food Story
+                      </p>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        ข้อมูลพื้นฐาน
+                      </h3>
+                      <dl className="space-y-4">
+                        <div className="border-b border-gray-200 pb-3">
+                          <dt className="text-sm font-medium text-gray-500 mb-1">
+                            Customer Reference
+                          </dt>
+                          <dd className="text-base text-gray-900">
+                            {memberData.customer_ref || "-"}
+                          </dd>
+                        </div>
+                        <div className="border-b border-gray-200 pb-3">
+                          <dt className="text-sm font-medium text-gray-500 mb-1">
+                            เบอร์โทรศัพท์
+                          </dt>
+                          <dd className="text-base text-gray-900">
+                            {memberData.mobile || "-"}
+                          </dd>
+                        </div>
+                        <div className="border-b border-gray-200 pb-3">
+                          <dt className="text-sm font-medium text-gray-500 mb-1">
+                            อีเมล
+                          </dt>
+                          <dd className="text-base text-gray-900 break-all">
+                            {memberData.email || "-"}
+                          </dd>
+                        </div>
+                        <div className="border-b border-gray-200 pb-3">
+                          <dt className="text-sm font-medium text-gray-500 mb-1">
+                            ชื่อ-นามสกุล (ไทย)
+                          </dt>
+                          <dd className="text-base text-gray-900">
+                            {memberData.firstname_th || "-"}{" "}
+                            {memberData.lastname_th || ""}
+                          </dd>
+                        </div>
+                        <div className="pb-3">
+                          <dt className="text-sm font-medium text-gray-500 mb-1">
+                            ชื่อ-นามสกุล (อังกฤษ)
+                          </dt>
+                          <dd className="text-base text-gray-900">
+                            {memberData.firstname_en || "-"}{" "}
+                            {memberData.lastname_en || ""}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        สถานะ
+                      </h3>
+                      <dl className="space-y-4">
+                        <div className="border-b border-gray-200 pb-3">
+                          <dt className="text-sm font-medium text-gray-500 mb-2">
+                            สถานะบัญชี
+                          </dt>
+                          <dd className="mt-1">
+                            <span
+                              className={`inline-flex px-3 py-1 text-sm font-medium rounded-md ${
+                                memberData.account_status === "active"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {memberData.account_status || "-"}
+                            </span>
+                          </dd>
+                        </div>
+                        <div className="pb-3">
+                          <dt className="text-sm font-medium text-gray-500 mb-1">
+                            ใช้งานล่าสุด
+                          </dt>
+                          <dd className="text-base text-gray-900">
+                            {memberData.last_active_at
+                              ? new Date(
+                                  memberData.last_active_at,
+                                ).toLocaleString("th-TH")
+                              : "-"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      สถานะ
-                    </h3>
-                    <dl className="space-y-4">
-                      <div className="border-b border-gray-200 pb-3">
-                        <dt className="text-sm font-medium text-gray-500 mb-2">
-                          สถานะบัญชี
-                        </dt>
-                        <dd className="mt-1">
-                          <span
-                            className={`inline-flex px-3 py-1 text-sm font-medium rounded-md ${
-                              memberData.account_status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {memberData.account_status || "-"}
-                          </span>
-                        </dd>
+
+                  {/* Migrated Data Section */}
+                  {memberData.isMigrated && memberData.migratedData && (
+                    <div className="border-t border-gray-200 pt-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        ข้อมูล Food Story เก่า
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <dt className="text-xs font-medium text-gray-500 mb-1">
+                            ชื่อ-นามสกุล (ไทย)
+                          </dt>
+                          <dd className="text-base font-semibold text-gray-900">
+                            {memberData.migratedData.firstname_th || "-"}{" "}
+                            {memberData.migratedData.lastname_th || ""}
+                          </dd>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <dt className="text-xs font-medium text-gray-500 mb-1">
+                            ชื่อ-นามสกุล (อังกฤษ)
+                          </dt>
+                          <dd className="text-base font-semibold text-gray-900">
+                            {memberData.migratedData.firstname_en || "-"}{" "}
+                            {memberData.migratedData.lastname_en || ""}
+                          </dd>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <dt className="text-xs font-medium text-gray-500 mb-1">
+                            Phone No
+                          </dt>
+                          <dd className="text-base font-semibold text-gray-900">
+                            {memberData.migratedData.phone_no || "-"}
+                          </dd>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <dt className="text-xs font-medium text-gray-500 mb-1">
+                            Current Point
+                          </dt>
+                          <dd className="text-lg font-bold text-blue-600">
+                            {memberData.migratedData.current_point
+                              ? memberData.migratedData.current_point.toLocaleString(
+                                  "th-TH",
+                                )
+                              : "-"}
+                          </dd>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <dt className="text-xs font-medium text-gray-500 mb-1">
+                            Tier ID
+                          </dt>
+                          <dd className="text-base font-semibold text-gray-900">
+                            {memberData.migratedData.tier_id || "-"}
+                          </dd>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <dt className="text-xs font-medium text-gray-500 mb-1">
+                            Tier Name
+                          </dt>
+                          <dd className="text-base font-semibold text-gray-900">
+                            {memberData.migratedData.tier_name ? (
+                              <span className="px-2 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded">
+                                {memberData.migratedData.tier_name}
+                              </span>
+                            ) : (
+                              "-"
+                            )}
+                          </dd>
+                        </div>
                       </div>
-                      <div className="pb-3">
-                        <dt className="text-sm font-medium text-gray-500 mb-1">
-                          ใช้งานล่าสุด
-                        </dt>
-                        <dd className="text-base text-gray-900">
-                          {memberData.last_active_at
-                            ? new Date(
-                                memberData.last_active_at,
-                              ).toLocaleString("th-TH")
-                            : "-"}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
 

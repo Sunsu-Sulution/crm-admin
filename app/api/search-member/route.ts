@@ -75,6 +75,36 @@ export async function POST(request: NextRequest) {
 
     // Query related data
     const customerRef = member.customer_ref;
+    const memberMobile = member.mobile;
+
+    // Check if member exists in migrate_food_story_members
+    let migratedMember = null;
+    if (memberMobile) {
+      try {
+        // Remove leading 0 if exists and convert to integer for phone_no
+        const phoneNo = parseInt(memberMobile.replace(/^0/, ''));
+        const migratedQuery = `
+          SELECT 
+            phone_no,
+            firstname_th,
+            lastname_th,
+            firstname_en,
+            lastname_en,
+            current_point,
+            tier_id,
+            tier_name
+          FROM migrate_food_story_members
+          WHERE phone_no = $1
+          LIMIT 1
+        `;
+        const migratedResult = await pool.query(migratedQuery, [phoneNo]);
+        if (migratedResult.rows.length > 0) {
+          migratedMember = migratedResult.rows[0];
+        }
+      } catch (error) {
+        console.error('Error querying migrate_food_story_members:', error);
+      }
+    }
 
     // Get bill details
     // Try to match by customer_ref (convert to text) or by member IDs
@@ -326,23 +356,40 @@ export async function POST(request: NextRequest) {
       })
     );
 
+    // Return member data with migrated info
+    const memberWithMigrated = {
+      customer_ref: member.customer_ref,
+      mobile: member.mobile,
+      email: member.email,
+      firstname_th: member.firstname_th,
+      lastname_th: member.lastname_th,
+      firstname_en: member.firstname_en,
+      lastname_en: member.lastname_en,
+      member_status: member.member_status,
+      account_status: member.account_status,
+      last_active_at: member.last_active_at,
+      isMigrated: !!migratedMember,
+      migratedData: migratedMember || undefined,
+    };
+
+    // If no tier movements but has migrated member, create tier movement from migrated data
+    const finalTierMovements = tierMovementsResult.rows.length > 0 
+      ? tierMovementsResult.rows 
+      : (migratedMember ? [{
+          tier_id: migratedMember.tier_id,
+          tier_name: migratedMember.tier_name,
+          entry_date: null,
+          expired_date: null,
+          loyalty_program_name: 'Food Story (Migrated)',
+          tier_group_name: 'Migrated',
+        }] : []);
+
     return NextResponse.json({
-      member: {
-        customer_ref: member.customer_ref,
-        mobile: member.mobile,
-        email: member.email,
-        firstname_th: member.firstname_th,
-        lastname_th: member.lastname_th,
-        firstname_en: member.firstname_en,
-        lastname_en: member.lastname_en,
-        member_status: member.member_status,
-        account_status: member.account_status,
-        last_active_at: member.last_active_at,
-      },
+      member: memberWithMigrated,
       bills: billsWithPromotions,
       coupons: couponsResult.rows,
       points: pointsResult.rows,
-      tierMovements: tierMovementsResult.rows,
+      tierMovements: finalTierMovements,
     });
 
     // Log for debugging
