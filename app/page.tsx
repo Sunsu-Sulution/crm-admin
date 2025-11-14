@@ -2,19 +2,23 @@
 
 import { Fragment, useMemo, useState } from "react";
 
+type MigratedSource =
+  | { source: "food_story"; data: MigratedFoodStoryMember }
+  | { source: "rocket"; data: MigratedRocketMember };
+
 interface MemberData {
-  customer_ref?: string;
-  mobile?: string;
-  email?: string;
-  firstname_th?: string;
-  lastname_th?: string;
-  firstname_en?: string;
-  lastname_en?: string;
-  member_status?: string;
-  account_status?: string;
-  last_active_at?: string;
-  isMigrated?: boolean;
-  migratedData?: MigratedFoodStoryMember;
+  customer_ref?: string | null;
+  mobile?: string | null;
+  email?: string | null;
+  firstname_th?: string | null;
+  lastname_th?: string | null;
+  firstname_en?: string | null;
+  lastname_en?: string | null;
+  member_status?: string | null;
+  account_status?: string | null;
+  last_active_at?: string | null;
+  migratedSources?: MigratedSource[];
+  isMigratedOnly?: boolean;
 }
 
 interface MigratedFoodStoryMember {
@@ -25,6 +29,13 @@ interface MigratedFoodStoryMember {
   lastname_en?: string;
   current_point?: number;
   tier_id?: number;
+  tier_name?: string;
+}
+
+interface MigratedRocketMember {
+  phone_no?: number;
+  fullname?: string;
+  current_point?: number;
   tier_name?: string;
 }
 
@@ -185,6 +196,11 @@ export default function Home() {
 
   const displayedBills = hasBillDateFilter ? filteredBills : billDetails;
   const hasBillResults = displayedBills.length > 0;
+  const accountStatusClass = !memberData?.account_status
+    ? "bg-gray-100 text-gray-700"
+    : memberData.account_status === "active"
+    ? "bg-green-100 text-green-800"
+    : "bg-red-100 text-red-800";
 
   const performSearch = async (
     payload: typeof searchFields,
@@ -424,21 +440,49 @@ export default function Home() {
               {/* Member Info Tab */}
               {activeTab === "info" && (
                 <div className="space-y-6">
-                  {memberData.isMigrated && memberData.migratedData && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-amber-600 font-semibold">
-                          ⚠️ Migrated Member
-                        </span>
-                        <span className="px-2 py-1 text-xs font-medium bg-amber-200 text-amber-800 rounded">
-                          Migrated from Food Story
-                        </span>
+                  {memberData.migratedSources &&
+                    memberData.migratedSources.length > 0 && (
+                      <div
+                        className={`${
+                          memberData.isMigratedOnly
+                            ? "bg-amber-50 border-amber-200"
+                            : "bg-blue-50 border-blue-200"
+                        } border rounded-lg p-4 mb-4`}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-semibold ${
+                                memberData.isMigratedOnly
+                                  ? "text-amber-700"
+                                  : "text-blue-700"
+                              }`}
+                            >
+                              {memberData.isMigratedOnly
+                                ? "แสดงข้อมูลจาก Migration เท่านั้น"
+                                : "มีข้อมูลจากระบบ Migration เพิ่มเติม"}
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              {memberData.migratedSources.map((source) => (
+                                <span
+                                  key={source.source}
+                                  className="px-2 py-1 text-xs font-medium bg-white/70 text-gray-700 rounded border border-gray-200"
+                                >
+                                  {source.source === "food_story"
+                                    ? "Food Story"
+                                    : "Rocket"}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            {memberData.isMigratedOnly
+                              ? "ไม่พบข้อมูลในระบบหลัก แสดงเฉพาะข้อมูลจากระบบที่ถูก migrate"
+                              : "ข้อมูลนี้มีรายละเอียดเพิ่มเติมจากระบบที่ถูก migrate"}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-amber-700">
-                        สมาชิกคนนี้ถูก migrate จาก Food Story
-                      </p>
-                    </div>
-                  )}
+                    )}
                   {memberCandidates.length > 1 && (
                     <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
@@ -480,6 +524,11 @@ export default function Home() {
                               <p className="text-sm font-semibold text-gray-900">
                                 {displayName}
                               </p>
+                              {candidate.isMigratedOnly && (
+                                <p className="text-xs text-amber-600 font-medium">
+                                  (ข้อมูลจาก Migration เท่านั้น)
+                                </p>
+                              )}
                               <p className="text-xs text-gray-500">
                                 Phone: {candidate.mobile || "-"}
                               </p>
@@ -553,11 +602,7 @@ export default function Home() {
                           </dt>
                           <dd className="mt-1">
                             <span
-                              className={`inline-flex px-3 py-1 text-sm font-medium rounded-md ${
-                                memberData.account_status === "active"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
+                              className={`inline-flex px-3 py-1 text-sm font-medium rounded-md ${accountStatusClass}`}
                             >
                               {memberData.account_status || "-"}
                             </span>
@@ -580,75 +625,142 @@ export default function Home() {
                   </div>
 
                   {/* Migrated Data Section */}
-                  {memberData.isMigrated && memberData.migratedData && (
-                    <div className="border-t border-gray-200 pt-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                        ข้อมูล Food Story เก่า
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <dt className="text-xs font-medium text-gray-500 mb-1">
-                            ชื่อ-นามสกุล (ไทย)
-                          </dt>
-                          <dd className="text-base font-semibold text-gray-900">
-                            {memberData.migratedData.firstname_th || "-"}{" "}
-                            {memberData.migratedData.lastname_th || ""}
-                          </dd>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <dt className="text-xs font-medium text-gray-500 mb-1">
-                            ชื่อ-นามสกุล (อังกฤษ)
-                          </dt>
-                          <dd className="text-base font-semibold text-gray-900">
-                            {memberData.migratedData.firstname_en || "-"}{" "}
-                            {memberData.migratedData.lastname_en || ""}
-                          </dd>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <dt className="text-xs font-medium text-gray-500 mb-1">
-                            Phone No
-                          </dt>
-                          <dd className="text-base font-semibold text-gray-900">
-                            {memberData.migratedData.phone_no || "-"}
-                          </dd>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <dt className="text-xs font-medium text-gray-500 mb-1">
-                            Current Point
-                          </dt>
-                          <dd className="text-lg font-bold text-blue-600">
-                            {memberData.migratedData.current_point
-                              ? memberData.migratedData.current_point.toLocaleString(
-                                  "th-TH",
-                                )
-                              : "-"}
-                          </dd>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <dt className="text-xs font-medium text-gray-500 mb-1">
-                            Tier ID
-                          </dt>
-                          <dd className="text-base font-semibold text-gray-900">
-                            {memberData.migratedData.tier_id || "-"}
-                          </dd>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <dt className="text-xs font-medium text-gray-500 mb-1">
-                            Tier Name
-                          </dt>
-                          <dd className="text-base font-semibold text-gray-900">
-                            {memberData.migratedData.tier_name ? (
-                              <span className="px-2 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded">
-                                {memberData.migratedData.tier_name}
-                              </span>
-                            ) : (
-                              "-"
-                            )}
-                          </dd>
-                        </div>
+                  {memberData.migratedSources &&
+                    memberData.migratedSources.length > 0 && (
+                      <div className="border-t border-gray-200 pt-6 space-y-6">
+                        {memberData.migratedSources
+                          .filter((source) => source.source === "food_story")
+                          .map((source) => {
+                            const data = source.data as MigratedFoodStoryMember;
+                            return (
+                              <div key="migrated-food-story">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                  ข้อมูล Food Story เก่า
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      ชื่อ-นามสกุล (ไทย)
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.firstname_th || "-"}{" "}
+                                      {data.lastname_th || ""}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      ชื่อ-นามสกุล (อังกฤษ)
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.firstname_en || "-"}{" "}
+                                      {data.lastname_en || ""}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      Phone No
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.phone_no || "-"}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      Current Point
+                                    </dt>
+                                    <dd className="text-lg font-bold text-blue-600">
+                                      {data.current_point
+                                        ? data.current_point.toLocaleString(
+                                            "th-TH",
+                                          )
+                                        : "-"}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      Tier ID
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.tier_id || "-"}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      Tier Name
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.tier_name ? (
+                                        <span className="px-2 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded">
+                                          {data.tier_name}
+                                        </span>
+                                      ) : (
+                                        "-"
+                                      )}
+                                    </dd>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                        {memberData.migratedSources
+                          .filter((source) => source.source === "rocket")
+                          .map((source) => {
+                            const data = source.data as MigratedRocketMember;
+                            return (
+                              <div key="migrated-rocket">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                                  ข้อมูล Rocket เก่า
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      ชื่อ-นามสกุล
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.fullname || "-"}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      Phone No
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.phone_no || "-"}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      Current Point
+                                    </dt>
+                                    <dd className="text-lg font-bold text-purple-600">
+                                      {data.current_point
+                                        ? data.current_point.toLocaleString(
+                                            "th-TH",
+                                          )
+                                        : "-"}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-gray-50 p-4 rounded-lg">
+                                    <dt className="text-xs font-medium text-gray-500 mb-1">
+                                      Tier Name
+                                    </dt>
+                                    <dd className="text-base font-semibold text-gray-900">
+                                      {data.tier_name ? (
+                                        <span className="px-2 py-1 text-sm font-medium bg-purple-100 text-purple-800 rounded">
+                                          {data.tier_name}
+                                        </span>
+                                      ) : (
+                                        "-"
+                                      )}
+                                    </dd>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               )}
 

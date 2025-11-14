@@ -5,6 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { customer_ref, mobile, email, name } = body;
+    const inputMobile = mobile?.trim() || null;
 
     // Build WHERE clause dynamically based on provided fields
     const conditions: string[] = [];
@@ -93,25 +94,15 @@ export async function POST(request: NextRequest) {
     const memberResult = await pool.query(memberQuery, values);
     const members = memberResult.rows;
 
-    if (members.length === 0) {
-      return NextResponse.json(
-        { error: 'ไม่พบข้อมูลสมาชิก' },
-        { status: 404 }
-      );
-    }
+    const fetchMigratedSources = async (phoneValue?: string | null) => {
+      const sources: Array<{ source: 'food_story' | 'rocket'; data: any }> = [];
+      if (!phoneValue) return sources;
+      const normalized = phoneValue.replace(/\D/g, '');
+      if (!normalized) return sources;
+      const phoneNo = parseInt(normalized, 10);
+      if (Number.isNaN(phoneNo)) return sources;
 
-    const member = members[0];
-
-    // Query related data
-    const customerRef = member.customer_ref;
-    const memberMobile = member.mobile;
-
-    // Check if member exists in migrate_food_story_members
-    let migratedMember = null;
-    if (memberMobile) {
       try {
-        // Remove leading 0 if exists and convert to integer for phone_no
-        const phoneNo = parseInt(memberMobile.replace(/^0/, ''));
         const migratedQuery = `
           SELECT 
             phone_no,
@@ -128,12 +119,96 @@ export async function POST(request: NextRequest) {
         `;
         const migratedResult = await pool.query(migratedQuery, [phoneNo]);
         if (migratedResult.rows.length > 0) {
-          migratedMember = migratedResult.rows[0];
+          sources.push({ source: 'food_story', data: migratedResult.rows[0] });
         }
       } catch (error) {
         console.error('Error querying migrate_food_story_members:', error);
       }
+
+      try {
+        const rocketQuery = `
+          SELECT 
+            phone_no,
+            fullname,
+            tier_name,
+            current_point
+          FROM migrate_rocket_members
+          WHERE phone_no = $1
+          LIMIT 1
+        `;
+        const rocketResult = await pool.query(rocketQuery, [phoneNo]);
+        if (rocketResult.rows.length > 0) {
+          sources.push({ source: 'rocket', data: rocketResult.rows[0] });
+        }
+      } catch (error) {
+        console.error('Error querying migrate_rocket_members:', error);
+      }
+
+      return sources;
+    };
+
+    if (members.length === 0) {
+      const migrateFallbackSources = await fetchMigratedSources(inputMobile);
+      if (migrateFallbackSources.length === 0) {
+        return NextResponse.json(
+          { error: 'ไม่พบข้อมูลสมาชิก' },
+          { status: 404 }
+        );
+      }
+
+      const fallbackTierMovements = migrateFallbackSources
+        .filter((source) => source.data?.tier_name)
+        .map((source) => ({
+          tier_id:
+            source.source === 'food_story'
+              ? source.data.tier_id ?? null
+              : null,
+          tier_name: source.data.tier_name,
+          entry_date: null,
+          expired_date: null,
+          loyalty_program_name:
+            source.source === 'food_story'
+              ? 'Food Story (Migrated)'
+              : 'Rocket (Migrated)',
+          tier_group_name: 'Migrated',
+        }));
+
+      const fallbackMember = {
+        customer_ref: null,
+        mobile: inputMobile,
+        email: null,
+        firstname_th: migrateFallbackSources.find((s) => s.source === 'food_story')
+          ?.data.firstname_th,
+        lastname_th: migrateFallbackSources.find((s) => s.source === 'food_story')
+          ?.data.lastname_th,
+        firstname_en: migrateFallbackSources.find((s) => s.source === 'food_story')
+          ?.data.firstname_en,
+        lastname_en: migrateFallbackSources.find((s) => s.source === 'food_story')
+          ?.data.lastname_en,
+        member_status: null,
+        account_status: null,
+        last_active_at: null,
+        migratedSources: migrateFallbackSources,
+        isMigratedOnly: true,
+      };
+
+      return NextResponse.json({
+        member: fallbackMember,
+        members: [fallbackMember],
+        bills: [],
+        coupons: [],
+        points: [],
+        tierMovements: fallbackTierMovements,
+      });
     }
+
+    const member = members[0];
+
+    // Query related data
+    const customerRef = member.customer_ref;
+    const memberMobile = member.mobile;
+
+    const migratedSources = await fetchMigratedSources(memberMobile);
 
     // Get bill details
     // Try to match by customer_ref (convert to text) or by member IDs
@@ -397,21 +472,30 @@ export async function POST(request: NextRequest) {
       member_status: member.member_status,
       account_status: member.account_status,
       last_active_at: member.last_active_at,
-      isMigrated: !!migratedMember,
-      migratedData: migratedMember || undefined,
+      migratedSources,
+      isMigratedOnly: false,
     };
 
     // If no tier movements but has migrated member, create tier movement from migrated data
-    const finalTierMovements = tierMovementsResult.rows.length > 0 
-      ? tierMovementsResult.rows 
-      : (migratedMember ? [{
-          tier_id: migratedMember.tier_id,
-          tier_name: migratedMember.tier_name,
+    let finalTierMovements = tierMovementsResult.rows;
+    if (finalTierMovements.length === 0 && migratedSources.length > 0) {
+      finalTierMovements = migratedSources
+        .filter((source) => source.data.tier_name)
+        .map((source) => ({
+          tier_id:
+            source.source === 'food_story'
+              ? source.data.tier_id ?? null
+              : null,
+          tier_name: source.data.tier_name,
           entry_date: null,
           expired_date: null,
-          loyalty_program_name: 'Food Story (Migrated)',
+          loyalty_program_name:
+            source.source === 'food_story'
+              ? 'Food Story (Migrated)'
+              : 'Rocket (Migrated)',
           tier_group_name: 'Migrated',
-        }] : []);
+        }));
+    }
 
     const responsePayload = {
       member: memberWithMigrated,
