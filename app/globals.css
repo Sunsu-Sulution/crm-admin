@@ -11,6 +11,43 @@ body {
   font-family: var(--font-kanit-sans), Arial, Helvetica, sans-serif;
 }
 
+body.dark {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+body.dark .bg-white {
+  background-color: #0f172a !important;
+}
+
+body.dark .bg-gray-50,
+body.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+}
+
+body.dark .text-gray-900,
+body.dark .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+
+body.dark .text-gray-700,
+body.dark .text-gray-600,
+body.dark .text-gray-500 {
+  color: #cbd5f5 !important;
+}
+
+body.dark .border-gray-200,
+body.dark .border-gray-300 {
+  border-color: #334155 !important;
+}
+
+body.dark input,
+body.dark select,
+body.dark textarea {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
