@@ -30,6 +30,10 @@ interface MigratedFoodStoryMember {
   current_point?: number;
   tier_id?: number;
   tier_name?: string;
+  birth_date?: string;
+  tier_entry_date?: string;
+  created_date?: string;
+  updated_date?: string;
 }
 
 interface MigratedRocketMember {
@@ -37,6 +41,10 @@ interface MigratedRocketMember {
   fullname?: string;
   current_point?: number;
   tier_name?: string;
+  birthdate?: string;
+  register_date?: string;
+  last_login_date?: string;
+  last_activity_date?: string;
 }
 
 interface BillDetail {
@@ -201,6 +209,15 @@ export default function Home() {
     : memberData.account_status === "active"
     ? "bg-green-100 text-green-800"
     : "bg-red-100 text-red-800";
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleDateString("th-TH");
+  };
 
   const performSearch = async (
     payload: typeof searchFields,
@@ -638,66 +655,91 @@ export default function Home() {
                                   ข้อมูล Food Story เก่า
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      ชื่อ-นามสกุล (ไทย)
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.firstname_th || "-"}{" "}
-                                      {data.lastname_th || ""}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      ชื่อ-นามสกุล (อังกฤษ)
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.firstname_en || "-"}{" "}
-                                      {data.lastname_en || ""}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      Phone No
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.phone_no || "-"}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      Current Point
-                                    </dt>
-                                    <dd className="text-lg font-bold text-blue-600">
-                                      {data.current_point
+                                  {[
+                                    {
+                                      label: "ชื่อ-นามสกุล (ไทย)",
+                                      value: `${data.firstname_th || "-"} ${
+                                        data.lastname_th || ""
+                                      }`.trim(),
+                                    },
+                                    {
+                                      label: "ชื่อ-นามสกุล (อังกฤษ)",
+                                      value: `${data.firstname_en || "-"} ${
+                                        data.lastname_en || ""
+                                      }`.trim(),
+                                    },
+                                    {
+                                      label: "Phone No",
+                                      value: data.phone_no || "-",
+                                    },
+                                    {
+                                      label: "วันเกิด",
+                                      value: formatDate(data.birth_date),
+                                    },
+                                    {
+                                      label: "Tier Entry Date",
+                                      value: formatDate(data.tier_entry_date),
+                                    },
+                                    {
+                                      label: "Current Point",
+                                      value: data.current_point
                                         ? data.current_point.toLocaleString(
                                             "th-TH",
                                           )
-                                        : "-"}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      Tier ID
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.tier_id || "-"}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      Tier Name
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.tier_name ? (
-                                        <span className="px-2 py-1 text-sm font-medium bg-blue-100 text-blue-800 rounded">
-                                          {data.tier_name}
-                                        </span>
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </dd>
-                                  </div>
+                                        : "-",
+                                      emphasize: true,
+                                      emphasizeColor: "text-blue-600",
+                                    },
+                                    {
+                                      label: "Tier ID",
+                                      value: data.tier_id || "-",
+                                    },
+                                    {
+                                      label: "Tier Name",
+                                      value: data.tier_name || "-",
+                                      badge: true,
+                                      badgeColor: "blue",
+                                    },
+                                    {
+                                      label: "Created Date",
+                                      value: formatDate(data.created_date),
+                                    },
+                                    {
+                                      label: "Updated Date",
+                                      value: formatDate(data.updated_date),
+                                    },
+                                  ].map((item, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="bg-gray-50 p-4 rounded-lg"
+                                    >
+                                      <dt className="text-xs font-medium text-gray-500 mb-1">
+                                        {item.label}
+                                      </dt>
+                                      <dd
+                                        className={`text-base font-semibold ${
+                                          item.emphasize
+                                            ? item.emphasizeColor ||
+                                              "text-blue-600"
+                                            : "text-gray-900"
+                                        }`}
+                                      >
+                                        {item.badge && item.value !== "-" ? (
+                                          <span
+                                            className={`px-2 py-1 text-sm font-medium rounded ${
+                                              item.badgeColor === "purple"
+                                                ? "bg-purple-100 text-purple-800"
+                                                : "bg-blue-100 text-blue-800"
+                                            }`}
+                                          >
+                                            {item.value}
+                                          </span>
+                                        ) : (
+                                          item.value
+                                        )}
+                                      </dd>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             );
@@ -713,48 +755,81 @@ export default function Home() {
                                   ข้อมูล Rocket เก่า
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      ชื่อ-นามสกุล
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.fullname || "-"}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      Phone No
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.phone_no || "-"}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      Current Point
-                                    </dt>
-                                    <dd className="text-lg font-bold text-purple-600">
-                                      {data.current_point
+                                  {[
+                                    {
+                                      label: "ชื่อ-นามสกุล",
+                                      value: data.fullname || "-",
+                                    },
+                                    {
+                                      label: "Phone No",
+                                      value: data.phone_no || "-",
+                                    },
+                                    {
+                                      label: "วันเกิด",
+                                      value: formatDate(data.birthdate),
+                                    },
+                                    {
+                                      label: "Register Date",
+                                      value: formatDate(data.register_date),
+                                    },
+                                    {
+                                      label: "Last Login",
+                                      value: formatDate(data.last_login_date),
+                                    },
+                                    {
+                                      label: "Last Activity",
+                                      value: formatDate(
+                                        data.last_activity_date,
+                                      ),
+                                    },
+                                    {
+                                      label: "Current Point",
+                                      value: data.current_point
                                         ? data.current_point.toLocaleString(
                                             "th-TH",
                                           )
-                                        : "-"}
-                                    </dd>
-                                  </div>
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <dt className="text-xs font-medium text-gray-500 mb-1">
-                                      Tier Name
-                                    </dt>
-                                    <dd className="text-base font-semibold text-gray-900">
-                                      {data.tier_name ? (
-                                        <span className="px-2 py-1 text-sm font-medium bg-purple-100 text-purple-800 rounded">
-                                          {data.tier_name}
-                                        </span>
-                                      ) : (
-                                        "-"
-                                      )}
-                                    </dd>
-                                  </div>
+                                        : "-",
+                                      emphasize: true,
+                                      emphasizeColor: "text-purple-600",
+                                    },
+                                    {
+                                      label: "Tier Name",
+                                      value: data.tier_name || "-",
+                                      badge: true,
+                                      badgeColor: "purple",
+                                    },
+                                  ].map((item, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="bg-gray-50 p-4 rounded-lg"
+                                    >
+                                      <dt className="text-xs font-medium text-gray-500 mb-1">
+                                        {item.label}
+                                      </dt>
+                                      <dd
+                                        className={`text-base font-semibold ${
+                                          item.emphasize
+                                            ? item.emphasizeColor ||
+                                              "text-purple-600"
+                                            : "text-gray-900"
+                                        }`}
+                                      >
+                                        {item.badge && item.value !== "-" ? (
+                                          <span
+                                            className={`px-2 py-1 text-sm font-medium rounded ${
+                                              item.badgeColor === "purple"
+                                                ? "bg-purple-100 text-purple-800"
+                                                : "bg-blue-100 text-blue-800"
+                                            }`}
+                                          >
+                                            {item.value}
+                                          </span>
+                                        ) : (
+                                          item.value
+                                        )}
+                                      </dd>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             );

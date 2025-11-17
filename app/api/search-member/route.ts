@@ -112,7 +112,11 @@ export async function POST(request: NextRequest) {
             lastname_en,
             current_point,
             tier_id,
-            tier_name
+            tier_name,
+            birth_date,
+            tier_entry_date,
+            created_date,
+            updated_date
           FROM migrate_food_story_members
           WHERE phone_no = $1
           LIMIT 1
@@ -131,7 +135,11 @@ export async function POST(request: NextRequest) {
             phone_no,
             fullname,
             tier_name,
-            current_point
+            current_point,
+            birthdate,
+            register_date,
+            last_login_date,
+            last_activity_date
           FROM migrate_rocket_members
           WHERE phone_no = $1
           LIMIT 1
@@ -173,18 +181,26 @@ export async function POST(request: NextRequest) {
           tier_group_name: 'Migrated',
         }));
 
+      const foodSource = migrateFallbackSources.find(
+        (s) => s.source === 'food_story',
+      );
+      const rocketSource = migrateFallbackSources.find(
+        (s) => s.source === 'rocket',
+      );
+      const rocketFullname = rocketSource?.data.fullname?.trim() || '';
+      const [rocketFirstName, ...rocketLastParts] = rocketFullname.split(' ');
+      const rocketLastName =
+        rocketLastParts.length > 0 ? rocketLastParts.join(' ') : null;
+
       const fallbackMember = {
         customer_ref: null,
         mobile: inputMobile,
         email: null,
-        firstname_th: migrateFallbackSources.find((s) => s.source === 'food_story')
-          ?.data.firstname_th,
-        lastname_th: migrateFallbackSources.find((s) => s.source === 'food_story')
-          ?.data.lastname_th,
-        firstname_en: migrateFallbackSources.find((s) => s.source === 'food_story')
-          ?.data.firstname_en,
-        lastname_en: migrateFallbackSources.find((s) => s.source === 'food_story')
-          ?.data.lastname_en,
+        firstname_th:
+          foodSource?.data.firstname_th || rocketFirstName || null,
+        lastname_th: foodSource?.data.lastname_th || rocketLastName || null,
+        firstname_en: foodSource?.data.firstname_en || null,
+        lastname_en: foodSource?.data.lastname_en || null,
         member_status: null,
         account_status: null,
         last_active_at: null,
@@ -497,9 +513,13 @@ export async function POST(request: NextRequest) {
         }));
     }
 
+    const membersWithMigrated = members.map((m) =>
+      m.customer_ref === member.customer_ref ? memberWithMigrated : m,
+    );
+
     const responsePayload = {
       member: memberWithMigrated,
-      members,
+      members: membersWithMigrated,
       bills: billsWithPromotions,
       coupons: couponsResult.rows,
       points: pointsResult.rows,
