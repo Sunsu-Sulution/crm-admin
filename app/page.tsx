@@ -377,9 +377,31 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-blue-500 text-sm font-medium text-blue-500 hover:bg-blue-500/10 transition"
+            className={`inline-flex items-center gap-3 px-4 py-2 rounded-full border transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+              theme === "dark"
+                ? "bg-slate-900 border-slate-700 text-slate-100 hover:bg-slate-800"
+                : "bg-white border-gray-200 text-gray-900 hover:bg-gray-50"
+            }`}
           >
-            {theme === "dark" ? "☀️ Light Mode" : "🌙 Dark Mode"}
+            <span className="text-xs font-semibold tracking-wide uppercase opacity-70">
+              Theme
+            </span>
+            <div className="relative inline-flex items-center">
+              <span
+                className={`w-12 h-6 rounded-full transition-colors ${
+                  theme === "dark" ? "bg-slate-700" : "bg-blue-200"
+                }`}
+              />
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow flex items-center justify-center text-xs transition-transform ${
+                  theme === "dark"
+                    ? "translate-x-5 bg-amber-200 text-amber-700"
+                    : "translate-x-0 text-blue-500"
+                }`}
+              >
+                {theme === "dark" ? "☀️" : "🌙"}
+              </span>
+            </div>
           </button>
         </div>
 
